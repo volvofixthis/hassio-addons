@@ -1,0 +1,23 @@
+name: "Prom write"
+description: "Addon for export metrics to prometheus write endpoint"
+version: "0.0.3"
+slug: "prom_write"
+init: false
+arch:
+  - aarch64
+  - amd64
+  - armhf
+  - armv7
+  - i386
+options:
+  ha_token: "secrent"
+  endpoint: "http://world"
+  username: "loki"
+  password: ""
+  interval: 1
+schema:
+  ha_token: str
+  endpoint: str
+  username: str
+  password: str
+  interval: int
