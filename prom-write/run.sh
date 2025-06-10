@@ -19,7 +19,7 @@ while true; do
     if [ $? -ne 0 ] || [ -z "$RESPONSE" ]; then
         bashio::log.error "Failed to fetch Prometheus data"
     else
-        bashio::log.info "Sending data to vmalert endpoint"
+        bashio::log.info "Sending data to import endpoint"
         echo "$RESPONSE" | curl -sSL -u "${USERNAME}:${PASSWORD}" \
             -X POST "${ENDPOINT}" --data-binary @-
 
