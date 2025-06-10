@@ -1,6 +1,6 @@
 name: "Prom write"
 description: "Addon for export metrics to prometheus write endpoint"
-version: "0.0.3"
+version: "0.0.4"
 slug: "prom_write"
 init: false
 arch:
