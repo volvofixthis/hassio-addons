@@ -1,6 +1,6 @@
 #!/usr/bin/with-contenv bashio
 
-set +e  # Allow command errors without killing the addon
+set -xe  # Allow command errors without killing the addon
 
 NOTIFIER_ENDPOINT=$(bashio::config 'notifier_endpoint')
 VICTORIAMETRICS_ENDPOINT=$(bashio::config 'victoriametrics_endpoint')
@@ -9,8 +9,8 @@ RULES_DIR="/data/rules"
 
 bashio::log.info "Starting vmalert"
 
-if [ ! -d "${TEMPLATES_DIR}" ]; then
-  cp -R /defaults/templates "${TEMPLATES_DIR}"
+if [ ! -d "${RULES_DIR}" ]; then
+  cp -R /defaults/rules "${RULES_DIR}"
 fi
 
 /usr/local/bin/vmalert --datasource.url=${VICTORIAMETRICS_ENDPOINT} \

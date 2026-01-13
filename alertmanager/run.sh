@@ -1,5 +1,5 @@
 #!/usr/bin/with-contenv bashio
-set +e
+set -xe
 
 TEMPLATES_DIR="/data/templates"
 LISTEN_ADDRESS=$(bashio::config 'listen_address')
@@ -15,7 +15,7 @@ if [ ! -d "${TEMPLATES_DIR}" ]; then
   cp -R /defaults/templates "${TEMPLATES_DIR}"
 fi
 
-exec /bin/alertmanager \
+exec /usr/local/bin/alertmanager \
   --web.listen-address="${LISTEN_ADDRESS}" \
   --config.file="${CONFIG_FILE}" \
   --storage.path=/data/storage \
