@@ -1,6 +1,6 @@
 name: "VMAlert"
 description: "Addon for alert rules evalution"
-version: "0.0.4"
+version: "0.0.5"
 slug: "vmalert"
 init: false
 arch:
@@ -9,6 +9,8 @@ arch:
   - armhf
   - armv7
   - i386
+map:
+  - addon_config:rw
 options:
   notifier_endpoint: "http://notifier"
   victoriametrics_endpoint: "http://victoriametrics"

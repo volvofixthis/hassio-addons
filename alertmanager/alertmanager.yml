@@ -3,7 +3,7 @@ global:
  telegram_api_url: "https://api.telegram.org"
 
 templates:
-  - '/data/templates/*.tmpl'
+  - '/config/templates/*.tmpl'
 
 receivers:
  - name: blackhole

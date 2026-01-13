@@ -1,7 +1,7 @@
 #!/usr/bin/with-contenv bashio
 set -xe
 
-TEMPLATES_DIR="/data/templates"
+TEMPLATES_DIR="/config/templates"
 LISTEN_ADDRESS=$(bashio::config 'listen_address')
 CONFIG_FILE=$(bashio::config 'config_file')
 EXTRA_ARGS=$(bashio::config 'extra_args')

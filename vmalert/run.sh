@@ -5,7 +5,7 @@ set -xe  # Allow command errors without killing the addon
 NOTIFIER_ENDPOINT=$(bashio::config 'notifier_endpoint')
 VICTORIAMETRICS_ENDPOINT=$(bashio::config 'victoriametrics_endpoint')
 EXTRA_ARGS=$(bashio::config 'extra_args')
-RULES_DIR="/data/rules"
+RULES_DIR="/config/rules"
 
 bashio::log.info "Starting vmalert"
 
@@ -17,5 +17,5 @@ fi
     --remoteRead.url=${VICTORIAMETRICS_ENDPOINT} \
     --remoteWrite.url=${VICTORIAMETRICS_ENDPOINT} \
     --notifier.url=${NOTIFIER_ENDPOINT} \
-    --rule=/data/rules/*.yml \
+    --rule=/config/rules/*.yml \
     ${EXTRA_ARGS}

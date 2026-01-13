@@ -1,5 +1,5 @@
 name: "Alertmanager"
-version: "0.0.3"
+version: "0.0.4"
 slug: "alertmanager"
 description: "VictoriaMetrics Alertmanager add-on"
 arch:
@@ -12,9 +12,12 @@ host_network: false
 ports:
   9093/tcp: 9093
 
+map:
+  - addon_config:rw
+
 options:
   listen_address: "0.0.0.0:9093"
-  config_file: "/data/alertmanager.yml"
+  config_file: "/config/alertmanager.yml"
   extra_args: "--log.level=debug"
 
 schema:
