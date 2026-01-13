@@ -1,8 +1,5 @@
 #!/usr/bin/with-contenv bashio
-set -xe
-
-# Ensure persistent folder exists
-mkdir -p /data
+set +e
 
 TEMPLATES_DIR="/data/templates"
 LISTEN_ADDRESS=$(bashio::config 'listen_address')
