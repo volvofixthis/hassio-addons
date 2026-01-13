@@ -17,5 +17,5 @@ fi
     --remoteRead.url=${VICTORIAMETRICS_ENDPOINT} \
     --remoteWrite.url=${VICTORIAMETRICS_ENDPOINT} \
     --notifier.url=${NOTIFIER_ENDPOINT} \
-    ---rule=/data/rules/*.yml \
+    --rule=/data/rules/*.yml \
     ${EXTRA_ARGS}

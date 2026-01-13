@@ -1,6 +1,6 @@
 name: "VMAlert"
 description: "Addon for alert rules evalution"
-version: "0.0.3"
+version: "0.0.4"
 slug: "vmalert"
 init: false
 arch:
