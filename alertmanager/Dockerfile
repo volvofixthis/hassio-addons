@@ -1,6 +1,6 @@
+ARG BUILD_FROM
 FROM prom/alertmanager:v0.27.0 as alertmanager
 
-ARG BUILD_FROM
 FROM $BUILD_FROM
 
 COPY --from=alertmanager /bin/alertmanager /usr/local/bin/alertmanager
