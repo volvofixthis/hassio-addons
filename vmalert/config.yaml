@@ -1,6 +1,6 @@
 name: "VMAlert"
 description: "Addon for alert rules evalution"
-version: "0.0.5"
+version: "0.0.6"
 slug: "vmalert"
 init: false
 arch:
@@ -14,7 +14,7 @@ map:
 options:
   notifier_endpoint: "http://notifier"
   victoriametrics_endpoint: "http://victoriametrics"
-  extra_args: "-loggerLevel=DEBUG"
+  extra_args: "-loggerLevel=INFO"
 schema:
   notifier_endpoint: str
   victoriametrics_endpoint: str
