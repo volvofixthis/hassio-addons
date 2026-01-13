@@ -1,0 +1,19 @@
+name: "VMAlert"
+description: "Addon for alert rules evalution"
+version: "0.0.1"
+slug: "vmalert"
+init: false
+arch:
+  - aarch64
+  - amd64
+  - armhf
+  - armv7
+  - i386
+options:
+  notifier_endpoint: "http://notifier"
+  victoriametrics_endpoint: "http://victoriametrics"
+  extra_args: "-loggerLevel=DEBUG"
+schema:
+  notifier_endpoint: str
+  victoriametrics_endpoint: str
+  extra_args: str

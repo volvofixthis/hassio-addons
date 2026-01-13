@@ -1,0 +1,19 @@
+groups:
+  - name: hass
+    interval: 30s
+    concurrency: 2
+    rules:
+      - alert: Moisture
+        expr: hass_kate_binary_sensor_state{entity=~"binary_sensor.tz3000_upgcbody_snzb_05|binary_sensor.tz3000_upgcbody_snzb_05_2|binary_sensor.tz3000_upgcbody_ts0207"} > 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Обнаружена протечка!"
+      - alert: Fire
+        expr:  hass_kate_sensor_temperature_celsius{entity="sensor.tze200_znbl8dj5_ts0601_temperature"} > 30.0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Слишком жарко, возможное возгорание!"

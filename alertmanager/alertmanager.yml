@@ -1,0 +1,34 @@
+global:
+ resolve_timeout: 5m
+ telegram_api_url: "https://api.telegram.org"
+
+templates:
+  - '/data/templates/*.tmpl'
+
+receivers:
+ - name: blackhole
+ - name: telegram-bot
+   telegram_configs:
+    - chat_id: -1
+      bot_token: ""
+      api_url: "https://api.telegram.org"
+      send_resolved: true
+      parse_mode: HTML
+      message: '{{ template "telegram.default" . }}'
+
+
+route:
+ group_by: ['alertname']
+ group_wait: 10s
+ group_interval: 10s
+ repeat_interval: 12h
+ receiver: telegram-bot
+ routes:
+  - receiver: telegram-bot
+    continue: true
+    matchers:
+     - severity="critical"
+     - severity="info"
+  - receiver: blackhole
+    matchers:
+     - alertname="Watchdog"

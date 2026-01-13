@@ -1,0 +1,26 @@
+groups:
+  - name: betfeeder
+    interval: 30s
+    concurrency: 2
+    rules:
+      - alert: BetFeederFeed
+        expr: increase(bet_feeder_feed[1m]) > 0
+        for: 30s
+        labels:
+          severity: info
+        annotations:
+          summary: "Бет накормлена!"
+      - alert: BetFeederUptime
+        expr: delta(bet_feeder_loop[5m]) < 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Bet feeder uptime"
+      - alert: BetFeederFeedErrors
+        expr: increase(bet_feeder_feed_errors[1m]) > 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Bet feeder feed errors"

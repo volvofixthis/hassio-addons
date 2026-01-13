@@ -1,0 +1,26 @@
+name: "Alertmanager"
+version: "0.0.1"
+slug: "alertmanager"
+description: "VictoriaMetrics Alertmanager add-on"
+arch:
+  - amd64
+  - aarch64
+  - armv7
+startup: services
+boot: auto
+init: false
+
+host_network: false
+ports:
+  9093/tcp: 9093
+
+options:
+  listen_address: "0.0.0.0:9093"
+  config_file: "/data/alertmanager.yml"
+  extra_args: "--log.level=debug"
+
+schema:
+  listen_address: str
+  config_file: str
+  extra_args: str
+
