@@ -9,5 +9,5 @@ COPY alertmanager.yml /defaults/alertmanager.yml
 COPY templates /defaults/templates
 
 RUN chmod +x /run.sh
-ENTRYPOINT ["/run.sh"]
+CMD [ "/run.sh" ]
 
