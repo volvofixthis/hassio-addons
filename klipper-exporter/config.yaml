@@ -1,0 +1,23 @@
+name: "Prometheus Klipper Exporter"
+description: "Prometheus exporter add-on for Klipper/Moonraker"
+version: "0.0.1"
+slug: "klipper_exporter"
+init: false
+arch:
+  - aarch64
+  - amd64
+  - armhf
+  - armv7
+  - i386
+ports:
+  9101/tcp: 9101
+options:
+  web_listen_address: "0.0.0.0:9101"
+  logging_level: "Info"
+  moonraker_apikey: ""
+  extra_args: ""
+schema:
+  web_listen_address: str
+  logging_level: str
+  moonraker_apikey: str
+  extra_args: str

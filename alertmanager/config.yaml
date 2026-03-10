@@ -1,7 +1,7 @@
 name: "Alertmanager"
-version: "0.0.4"
+version: "0.0.5"
 slug: "alertmanager"
-description: "VictoriaMetrics Alertmanager add-on"
+description: "Prom Alertmanager add-on"
 arch:
   - amd64
   - aarch64

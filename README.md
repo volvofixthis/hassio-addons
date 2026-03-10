@@ -19,3 +19,10 @@ After that, you need to create a long-lived access token in Home Assistant
 and add it to the addon configuration.
 
 My import endpoint is password-protected, so I also added a username and password.
+
+### Prometheus Klipper Exporter
+This addon runs `prometheus-klipper-exporter` for Klipper/Moonraker.
+
+By default it listens on `0.0.0.0:9101` and exposes metrics endpoints used by Prometheus.
+If your Moonraker instance requires API key authentication, set `moonraker_apikey`
+in the add-on configuration.
