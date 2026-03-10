@@ -1,6 +1,6 @@
 name: "Prometheus Klipper Exporter"
 description: "Prometheus exporter add-on for Klipper/Moonraker"
-version: "0.0.2"
+version: "0.0.3"
 slug: "klipper_exporter"
 init: false
 arch:
@@ -9,6 +9,7 @@ arch:
   - armhf
   - armv7
   - i386
+host_network: false
 ports:
   9101/tcp: 9101
 options:
