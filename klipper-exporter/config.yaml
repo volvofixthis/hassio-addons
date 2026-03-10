@@ -1,6 +1,6 @@
 name: "Prometheus Klipper Exporter"
 description: "Prometheus exporter add-on for Klipper/Moonraker"
-version: "0.0.1"
+version: "0.0.2"
 slug: "klipper_exporter"
 init: false
 arch:
