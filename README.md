@@ -1,5 +1,28 @@
 ## About
 This is my custom Home Assistant (Hass.io) addons.
+
+### Alertmanager
+This addon runs Prometheus Alertmanager and exposes the web/API interface on `9093`.
+
+On first start, it copies default files into the add-on config directory if they do not exist yet:
+- `/config/alertmanager.yml`
+- `/config/templates`
+
+You can configure:
+- `listen_address` (default: `0.0.0.0:9093`)
+- `config_file` (default: `/config/alertmanager.yml`)
+- `extra_args` (additional Alertmanager CLI flags)
+
+### VMAlert
+This addon runs VictoriaMetrics `vmalert` to evaluate alert rules and send notifications.
+
+On first start, it copies default rules into `/config/rules` if the folder does not exist.
+
+You can configure:
+- `notifier_endpoint` (Alertmanager URL used by `--notifier.url`)
+- `victoriametrics_endpoint` (used for datasource, remote read, and remote write)
+- `extra_args` (additional `vmalert` CLI flags)
+
 ### Prom write
 This addon scrapes metrics from Home Assistant and sends them  
 to vmagent using the Prometheus import endpoint at /api/v1/import/prometheus.  
