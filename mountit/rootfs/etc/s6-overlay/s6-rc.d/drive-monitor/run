@@ -21,6 +21,16 @@ if bashio::config.true 'expose_network_storage'; then
     EXPOSE_NETWORK_STORAGE=true
 fi
 
+MOUNT_ROOT="/mnt"
+if [[ "$EXPOSE_NETWORK_STORAGE" != "true" ]]; then
+    case "$usage" in
+        media|share|backup)
+            MOUNT_ROOT="/${usage}" ;;
+        *)
+            MOUNT_ROOT="/mnt" ;;
+    esac
+fi
+
 mount_and_register() {
     local devname="$1"
     local fstype label mdisk options="nosuid,relatime" type="auto" cmd="mount"
@@ -54,8 +64,10 @@ mount_and_register() {
 
     bashio::log.info "Hot-plug: $devname detected ($mdisk [$fstype])"
 
-    mkdir -p "/mnt/$mdisk"
-    chmod a+rwx "/mnt/$mdisk"
+    local mount_point="${MOUNT_ROOT}/${mdisk}"
+
+    mkdir -p "$mount_point"
+    chmod a+rwx "$mount_point"
 
     local m_args=()
     case "$fstype" in
@@ -68,7 +80,7 @@ mount_and_register() {
     m_args+=("$devname")
 
     local mounted=false fix_out=""
-    if $cmd "${m_args[@]}" "/mnt/$mdisk"; then
+    if $cmd "${m_args[@]}" "$mount_point"; then
         mounted=true
     elif [[ "$fstype" == "ntfs" ]]; then
         # try clean up NTFS dirty state with ntfsfix
@@ -76,7 +88,7 @@ mount_and_register() {
         if fix_out=$(ntfsfix -d "$devname" 2>&1); then
             bashio::log.info "Hot-plug: $mdisk ntfsfix: ${fix_out//$'\n'/; }"
             bashio::log.warning "Hot-plug: $mdisk — NTFS dirty flag cleared without a full repair; if the drive was not safely ejected, verify data with chkdsk on Windows"
-            $cmd "${m_args[@]}" "/mnt/$mdisk" && mounted=true
+            $cmd "${m_args[@]}" "$mount_point" && mounted=true
         else
             bashio::log.warning "Hot-plug: $mdisk ntfsfix failed: ${fix_out//$'\n'/; }"
         fi
@@ -84,12 +96,12 @@ mount_and_register() {
 
     if ! $mounted; then
         bashio::log.error "Hot-plug: failed to mount $mdisk"
-        rmdir "/mnt/$mdisk" 2>/dev/null || true
+        rmdir "$mount_point" 2>/dev/null || true
         return
     fi
 
     jq --arg k "$mdisk" --arg dev "$devname" \
-       --arg mp "/mnt/$mdisk" --arg fs "${fstype:-unknown}" \
+       --arg mp "$mount_point" --arg fs "${fstype:-unknown}" \
        '. + {($k): {"device":$dev,"mount_point":$mp,"label":$k,"fstype":$fs}}' \
        /tmp/mountit_mounts.json > /tmp/mountit_mounts.json.tmp \
     && mv /tmp/mountit_mounts.json.tmp /tmp/mountit_mounts.json
@@ -122,13 +134,13 @@ mount_and_register() {
 
         bashio::log.green "Hot-plug: $mdisk mounted and registered"
     else
-        bashio::log.green "Hot-plug: $mdisk mounted locally"
+        bashio::log.green "Hot-plug: $mdisk mounted locally at $mount_point"
     fi
 }
 
 unmount_and_deregister() {
     local devname="$1"
-    local mdisk
+    local mdisk mount_point
 
     mdisk=$(jq -r --arg dev "$devname" \
         'to_entries[] | select(.value.device==$dev) | .key' \
@@ -143,8 +155,11 @@ unmount_and_deregister() {
             || bashio::log.warning "Hot-plug: could not remove HA mount $mdisk"
     fi
 
-    umount -l "/mnt/$mdisk" 2>/dev/null || true
-    rmdir "/mnt/$mdisk" 2>/dev/null || true
+    mount_point=$(jq -r --arg k "$mdisk" '.[$k].mount_point // empty' /tmp/mountit_mounts.json 2>/dev/null)
+    [[ -z "$mount_point" ]] && mount_point="${MOUNT_ROOT}/${mdisk}"
+
+    umount -l "$mount_point" 2>/dev/null || true
+    rmdir "$mount_point" 2>/dev/null || true
 
     if [[ "$EXPOSE_NETWORK_STORAGE" == "true" ]]; then
         python3 - "$mdisk" << 'PYEOF'

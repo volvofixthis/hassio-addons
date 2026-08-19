@@ -6,7 +6,7 @@ you can disable that and keep the mounts local to the add-on.
 
 ## How it works
 
-1. On startup, detected drives are mounted inside the addon at `/mnt/<label>`
+1. On startup, detected drives are mounted inside the addon at `/mnt/<label>` when `expose_network_storage` is enabled, or at `/<mount_location>/<label>` when it is disabled
 2. If `expose_network_storage` is enabled, a minimal Samba server exposes each mount as a private share
 3. If enabled, the HA Supervisor registers each share as network storage (Settings → Storage)
 4. On shutdown, HA network mounts are cleanly removed and drives unmounted
@@ -26,7 +26,7 @@ when enabled, register it as network storage (if `automount_on_plugin` is enable
 | `hdd_idle_seconds` | `0` | Spin down drives after N seconds idle (0 = disabled). The HAOS system disk is always excluded. |
 | `file_activity_detail` | `off` | File activity logging level: `off`, `basic`, or `detailed` |
 
-When `expose_network_storage` is `false`, Mount It still mounts drives under `/mnt`, but it does not start Samba, register anything in **Settings → Storage**, or process `folder_mounts`.
+When `expose_network_storage` is `false`, Mount It mounts drives directly under `/<mount_location>/<label>` instead of `/mnt/<label>`. It also does not start Samba, register anything in **Settings → Storage**, or process `folder_mounts`.
 
 ## File Activity Log
 

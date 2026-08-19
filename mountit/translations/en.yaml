@@ -16,12 +16,13 @@ configuration:
   mount_location:
     name: Mount Location
     description: >-
-      Default HA storage location to expose drives: media, share, or backup (default: media)
+      HA storage location to use: media, share, or backup. With network storage enabled this controls HA exposure;
+      when disabled, drives mount directly under /media, /share, or /backup (default: media)
   expose_network_storage:
     name: Expose as Network Storage
     description: >-
       Expose mounted drives to Home Assistant as network storage and start the internal Samba server.
-      Disable this to keep mounts local to the add-on only (default: true)
+      Disable this to mount drives directly under the selected mount location without Samba or HA registration (default: true)
   hdd_idle_seconds:
     name: HDD Idle Power-Down
     description: >-

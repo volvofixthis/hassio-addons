@@ -36,7 +36,7 @@ ext2/3/4, NTFS, Btrfs, XFS, exFAT/FAT32, APFS (read-only)
 
 See [DOCS.md](DOCS.md) for full configuration reference.
 
-Set `expose_network_storage` to `false` if you only want Mount It to mount drives locally and do not want it to start Samba or create Home Assistant network storage entries.
+Set `expose_network_storage` to `false` if you want Mount It to mount drives directly under `/media`, `/share`, or `/backup` based on `mount_location`, without starting Samba or creating Home Assistant network storage entries.
 
 [aarch64-shield]: https://img.shields.io/badge/aarch64-yes-green.svg
 [amd64-shield]: https://img.shields.io/badge/amd64-yes-green.svg

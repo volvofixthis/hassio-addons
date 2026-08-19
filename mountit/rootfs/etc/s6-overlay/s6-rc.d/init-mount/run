@@ -14,7 +14,6 @@ fi
 
 echo "{}" > /tmp/mountit_mounts.json
 echo "{}" > /tmp/mountit_folder_mounts.json
-mkdir -p /mnt
 
 # ---- Config ----
 specific_label=$(bashio::config 'specific_label' 2>/dev/null || echo "")
@@ -22,6 +21,17 @@ mount_location=$(bashio::config 'mount_location')
 EXPOSE_NETWORK_STORAGE=false
 if bashio::config.true 'expose_network_storage'; then
     EXPOSE_NETWORK_STORAGE=true
+fi
+
+MOUNT_ROOT="/mnt"
+if [[ "$EXPOSE_NETWORK_STORAGE" != "true" ]]; then
+    case "$mount_location" in
+        media|share|backup)
+            MOUNT_ROOT="/${mount_location}" ;;
+        *)
+            bashio::log.warning "  mount_location '$mount_location' is invalid for local mounts; using /mnt"
+            MOUNT_ROOT="/mnt" ;;
+    esac
 fi
 
 addon_ip=$(bashio::addon.ip_address 2>/dev/null || echo "")
@@ -45,10 +55,13 @@ bashio::log.info "  automount_on_plugin: $(bashio::config 'automount_on_plugin')
 bashio::log.info "  specific_label:      ${specific_label:-(any)}"
 bashio::log.info "  mount_location:      $mount_location"
 bashio::log.info "  expose_network_storage: $EXPOSE_NETWORK_STORAGE"
+bashio::log.info "  local_mount_root:    $MOUNT_ROOT"
 bashio::log.info "  hdd_idle_seconds:    $(bashio::config 'hdd_idle_seconds')"
 if [[ "$EXPOSE_NETWORK_STORAGE" == "true" ]]; then
     bashio::log.info "  samba bind address:  ${addon_ip:-(all interfaces)}"
 fi
+
+mkdir -p "$MOUNT_ROOT"
 
 # ---- File activity auditing (Samba full_audit VFS module) ----
 # Migrate the previous toggle/detail pair without unexpectedly enabling logging
@@ -187,12 +200,14 @@ mount_drive() {
         return 1
     fi
 
-    mkdir -p "/mnt/$mdisk"
-    chmod a+rwx "/mnt/$mdisk"
+    local mount_point="${MOUNT_ROOT}/${mdisk}"
 
-    if findmnt -n -o TARGET "/mnt/$mdisk" > /dev/null 2>&1; then
+    mkdir -p "$mount_point"
+    chmod a+rwx "$mount_point"
+
+    if findmnt -n -o TARGET "$mount_point" > /dev/null 2>&1; then
         bashio::log.info "  $mdisk — already mounted"
-        jq --arg k "$mdisk" --arg dev "$dev" --arg mp "/mnt/$mdisk" --arg fs "unknown" \
+        jq --arg k "$mdisk" --arg dev "$dev" --arg mp "$mount_point" --arg fs "unknown" \
            '. + {($k): {"device":$dev,"mount_point":$mp,"label":$k,"fstype":$fs}}' \
            /tmp/mountit_mounts.json > /tmp/mountit_mounts.json.tmp \
         && mv /tmp/mountit_mounts.json.tmp /tmp/mountit_mounts.json
@@ -218,7 +233,7 @@ mount_drive() {
     m_args+=("$dev")
 
     local mounted=false fix_out=""
-    if $cmd "${m_args[@]}" "/mnt/$mdisk"; then
+    if $cmd "${m_args[@]}" "$mount_point"; then
         mounted=true
     elif [[ "$fstype" == "ntfs" ]]; then
         # try clean up NTFS dirty state with ntfsfix
@@ -226,22 +241,22 @@ mount_drive() {
         if fix_out=$(ntfsfix -d "$dev" 2>&1); then
             bashio::log.info "  $mdisk — ntfsfix: ${fix_out//$'\n'/; }"
             bashio::log.warning "  $mdisk — NTFS dirty flag cleared without a full repair; if the drive was not safely ejected, verify data with chkdsk on Windows"
-            $cmd "${m_args[@]}" "/mnt/$mdisk" && mounted=true
+            $cmd "${m_args[@]}" "$mount_point" && mounted=true
         else
             bashio::log.warning "  $mdisk — ntfsfix failed: ${fix_out//$'\n'/; }"
         fi
     fi
 
     if $mounted; then
-        bashio::log.green "  $mdisk [$fstype] → /mnt/$mdisk"
+        bashio::log.green "  $mdisk [$fstype] → $mount_point"
         jq --arg k "$mdisk" --arg dev "$dev" \
-           --arg mp "/mnt/$mdisk" --arg fs "${fstype:-unknown}" \
+           --arg mp "$mount_point" --arg fs "${fstype:-unknown}" \
            '. + {($k): {"device":$dev,"mount_point":$mp,"label":$k,"fstype":$fs}}' \
            /tmp/mountit_mounts.json > /tmp/mountit_mounts.json.tmp \
         && mv /tmp/mountit_mounts.json.tmp /tmp/mountit_mounts.json
     else
         bashio::log.error "  $mdisk [$fstype] — mount failed"
-        rmdir "/mnt/$mdisk" 2>/dev/null || true
+        rmdir "$mount_point" 2>/dev/null || true
         return 1
     fi
 }
