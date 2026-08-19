@@ -10,14 +10,12 @@ Operational guide for coding agents working in this repository.
   - `vmalert/`
   - `prom-write/`
   - `klipper-exporter/`
-  - `mountit/`
 - Main artifact types:
   - Bash entrypoints (`run.sh`)
   - Add-on metadata (`config.yaml`)
   - Dockerfiles
   - Alert/routing YAML files
   - Alertmanager templates (`*.tmpl`)
-  - s6 service scripts under `mountit/rootfs/etc/s6-overlay/s6-rc.d/`
   - Add-on translations (`translations/*.yaml`)
 
 ## Source of Truth and Rule Files
@@ -36,10 +34,8 @@ Operational guide for coding agents working in this repository.
   - `docker build --build-arg BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.19 -t hass-addon-prom-write ./prom-write`
 - Build Klipper Exporter add-on image:
   - `docker build --build-arg BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.19 -t hass-addon-klipper-exporter ./klipper-exporter`
-- Build Mount It add-on image:
-  - `docker build --build-arg BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.19 -t hass-addon-mountit ./mountit`
 - Build all add-ons (sequential):
-  - `docker build --build-arg BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.19 -t hass-addon-alertmanager ./alertmanager && docker build --build-arg BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.19 -t hass-addon-vmalert ./vmalert && docker build --build-arg BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.19 -t hass-addon-prom-write ./prom-write && docker build --build-arg BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.19 -t hass-addon-klipper-exporter ./klipper-exporter && docker build --build-arg BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.19 -t hass-addon-mountit ./mountit`
+  - `docker build --build-arg BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.19 -t hass-addon-alertmanager ./alertmanager && docker build --build-arg BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.19 -t hass-addon-vmalert ./vmalert && docker build --build-arg BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.19 -t hass-addon-prom-write ./prom-write && docker build --build-arg BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.19 -t hass-addon-klipper-exporter ./klipper-exporter`
 
 - `BUILD_FROM` must be compatible with your architecture.
 - Keep tags local unless explicitly publishing.
@@ -49,15 +45,15 @@ Operational guide for coding agents working in this repository.
 There is no centralized lint task yet; run tool-specific checks.
 
 - Lint all shell scripts:
-  - `shellcheck alertmanager/run.sh vmalert/run.sh prom-write/run.sh klipper-exporter/run.sh mountit/rootfs/etc/s6-overlay/s6-rc.d/init-mount/run mountit/rootfs/etc/s6-overlay/s6-rc.d/drive-monitor/run mountit/rootfs/etc/s6-overlay/s6-rc.d/ha-register/run mountit/rootfs/etc/s6-overlay/s6-rc.d/ha-register/finish mountit/rootfs/etc/s6-overlay/s6-rc.d/smbd/run`
+  - `shellcheck alertmanager/run.sh vmalert/run.sh prom-write/run.sh klipper-exporter/run.sh`
 - Lint a single shell script:
   - `shellcheck vmalert/run.sh`
 - Fast shell syntax check (all):
-  - `bash -n alertmanager/run.sh vmalert/run.sh prom-write/run.sh klipper-exporter/run.sh mountit/rootfs/etc/s6-overlay/s6-rc.d/init-mount/run mountit/rootfs/etc/s6-overlay/s6-rc.d/drive-monitor/run mountit/rootfs/etc/s6-overlay/s6-rc.d/ha-register/run mountit/rootfs/etc/s6-overlay/s6-rc.d/ha-register/finish mountit/rootfs/etc/s6-overlay/s6-rc.d/smbd/run`
+  - `bash -n alertmanager/run.sh vmalert/run.sh prom-write/run.sh klipper-exporter/run.sh`
 - Fast shell syntax check (single file):
   - `bash -n prom-write/run.sh`
 - Lint all YAML files:
-  - `yamllint repository.json alertmanager/config.yaml alertmanager/alertmanager.yml vmalert/config.yaml vmalert/rules/*.yml prom-write/config.yaml klipper-exporter/config.yaml mountit/config.yaml mountit/translations/en.yaml`
+  - `yamllint repository.json alertmanager/config.yaml alertmanager/alertmanager.yml vmalert/config.yaml vmalert/rules/*.yml prom-write/config.yaml klipper-exporter/config.yaml`
 - Lint a single YAML file:
   - `yamllint vmalert/rules/alerts-hass.yml`
 - Validate Prometheus/VictoriaMetrics rule file (single rule file):
@@ -74,7 +70,6 @@ Use these checks as the practical baseline:
 - Run `bash -n` and `shellcheck` on changed shell scripts.
 - Run `yamllint` on changed YAML files.
 - Run `promtool check rules` for changed `vmalert/rules/*.yml` files.
-- For `mountit/`, cover s6 service scripts as the effective shell entrypoints, not just a top-level `run.sh`.
 
 ### Running a Single Test
 
@@ -86,12 +81,6 @@ Use these checks as the practical baseline:
   - `yamllint alertmanager/alertmanager.yml`
 - Single alert rule validation test:
   - `promtool check rules vmalert/rules/alerts-bet-feeder.yml`
-- Single Mount It shell syntax test:
-  - `bash -n mountit/rootfs/etc/s6-overlay/s6-rc.d/init-mount/run`
-- Single Mount It shell lint test:
-  - `shellcheck mountit/rootfs/etc/s6-overlay/s6-rc.d/drive-monitor/run`
-- Single Mount It YAML lint test:
-  - `yamllint mountit/config.yaml mountit/translations/en.yaml`
 
 ## Code Style Guidelines
 
@@ -138,7 +127,6 @@ Use these checks as the practical baseline:
 ### Naming Conventions
 
 - Add-on option keys: lowercase snake_case (`notifier_endpoint`).
-- `mountit` uses `expose_network_storage` to control both Samba startup and HA Supervisor mount registration; when disabled, `folder_mounts` and Samba audit logging should stay inactive.
 - Shell vars derived from options: uppercase snake case (`NOTIFIER_ENDPOINT`).
 - Alert names: concise PascalCase-like style (`BetFeederFeedErrors`) consistent with existing rules.
 - Rule file names should stay descriptive (for example `alerts-hass.yml`).
