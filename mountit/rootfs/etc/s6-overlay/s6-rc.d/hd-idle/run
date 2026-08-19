@@ -1,0 +1,22 @@
+#!/usr/bin/with-contenv bashio
+# shellcheck shell=bash
+# ==============================================================================
+# Start hd-idle service
+# ==============================================================================
+if bashio::config.has_value 'hdd_idle_seconds' && ! bashio::config.equals 'hdd_idle_seconds' '0'; then
+    idle=$(bashio::config 'hdd_idle_seconds')
+
+    # Never spin down the disk HAOS itself lives on
+    args=(-i "$idle")
+    sysdev=$(blkid -L hassos-data 2>/dev/null || true)
+    if [[ -n "$sysdev" ]]; then
+        sysdisk=$(lsblk -no PKNAME "$sysdev" 2>/dev/null | head -1)
+        [[ -n "$sysdisk" ]] && args+=(-a "$sysdisk" -i 0)
+    fi
+
+    bashio::log.info "Enabling HDD idle spin-down after ${idle}s (excluding system disk ${sysdisk:-unknown})"
+    bashio::log.warning "HDD idle is subject to host file-handle policy; actual spin-down may be delayed"
+    exec hd-idle "${args[@]}"
+else
+    exec sleep infinity
+fi
