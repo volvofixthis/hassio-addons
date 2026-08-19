@@ -49,3 +49,10 @@ This addon runs `prometheus-klipper-exporter` for Klipper/Moonraker.
 By default it listens on `0.0.0.0:9101` and exposes metrics endpoints used by Prometheus.
 If your Moonraker instance requires API key authentication, set `moonraker_apikey`
 in the add-on configuration.
+
+### Mount It
+This addon mounts external USB/SATA drives on Home Assistant OS.
+
+By default it also exposes mounted drives as Home Assistant network storage via the
+Supervisor mounts API and an internal Samba server. If you only want the drives
+mounted inside the add-on, set `expose_network_storage` to `false`.

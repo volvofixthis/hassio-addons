@@ -1,8 +1,8 @@
 ---
 name: "Mount It"
-version: 1.2.0
+version: 1.2.1
 slug: mountit
-description: Automatically detect and mount USB/SATA drives as Home Assistant network storage
+description: Automatically detect and mount USB/SATA drives, with optional Home Assistant network storage exposure
 url: https://github.com/EnderDragonEP/HomeAssistant-Apps
 arch:
   - armv7
@@ -31,6 +31,7 @@ options:
   automount_on_plugin: true
   specific_label: ""
   mount_location: media
+  expose_network_storage: true
   hdd_idle_seconds: 0
   file_activity_detail: "off"
   folder_mounts: []
@@ -39,6 +40,7 @@ schema:
   automount_on_plugin: bool
   specific_label: str?
   mount_location: list(media|share|backup)
+  expose_network_storage: bool
   hdd_idle_seconds: int(0,)?
   file_activity_detail: list(off|basic|detailed)
   folder_mounts:

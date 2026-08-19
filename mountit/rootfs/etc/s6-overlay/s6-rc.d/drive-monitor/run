@@ -16,6 +16,10 @@ usage=$(bashio::config 'mount_location')
 username="_mountit_"
 password=$(cat /tmp/mountit_password 2>/dev/null || echo "")
 specific_label=$(bashio::config 'specific_label' 2>/dev/null || echo "")
+EXPOSE_NETWORK_STORAGE=false
+if bashio::config.true 'expose_network_storage'; then
+    EXPOSE_NETWORK_STORAGE=true
+fi
 
 mount_and_register() {
     local devname="$1"
@@ -90,32 +94,36 @@ mount_and_register() {
        /tmp/mountit_mounts.json > /tmp/mountit_mounts.json.tmp \
     && mv /tmp/mountit_mounts.json.tmp /tmp/mountit_mounts.json
 
-    {
-        printf '[%s]\n' "$mdisk"
-        printf '   path = /mnt/%s\n' "$mdisk"
-        printf '   valid users = _mountit_\n'
-        printf '   read only = No\n'
-        printf '   guest ok = No\n'
-        printf '   force user = root\n'
-        printf '   create mask = 0777\n'
-        printf '   directory mask = 0777\n\n'
-    } >> /etc/samba/smb.conf
-    smbcontrol smbd reload-config 2>/dev/null || true
+    if [[ "$EXPOSE_NETWORK_STORAGE" == "true" ]]; then
+        {
+            printf '[%s]\n' "$mdisk"
+            printf '   path = /mnt/%s\n' "$mdisk"
+            printf '   valid users = _mountit_\n'
+            printf '   read only = No\n'
+            printf '   guest ok = No\n'
+            printf '   force user = root\n'
+            printf '   create mask = 0777\n'
+            printf '   directory mask = 0777\n\n'
+        } >> /etc/samba/smb.conf
+        smbcontrol smbd reload-config 2>/dev/null || true
 
-    local cmd_json
-    cmd_json=$(jq -nrc \
-        --arg name "$mdisk" --arg share "$mdisk" \
-        --arg ip "${ipaddress/\/*/}" --arg user "$username" \
-        --arg pwd "$password" --arg usage "$usage" \
-        '{"name":$name,"type":"cifs","server":$ip,"share":$share,"username":$user,"password":$pwd,"usage":$usage}')
+        local cmd_json
+        cmd_json=$(jq -nrc \
+            --arg name "$mdisk" --arg share "$mdisk" \
+            --arg ip "${ipaddress/\/*/}" --arg user "$username" \
+            --arg pwd "$password" --arg usage "$usage" \
+            '{"name":$name,"type":"cifs","server":$ip,"share":$share,"username":$user,"password":$pwd,"usage":$usage}')
 
-    for rt in 1 2 3; do
-        bashio::api.supervisor POST /mounts "$cmd_json" && break
-        bashio::log.warning "Hot-plug: register retry $rt/3 for $mdisk"
-        sleep 3
-    done
+        for rt in 1 2 3; do
+            bashio::api.supervisor POST /mounts "$cmd_json" && break
+            bashio::log.warning "Hot-plug: register retry $rt/3 for $mdisk"
+            sleep 3
+        done
 
-    bashio::log.green "Hot-plug: $mdisk mounted and registered"
+        bashio::log.green "Hot-plug: $mdisk mounted and registered"
+    else
+        bashio::log.green "Hot-plug: $mdisk mounted locally"
+    fi
 }
 
 unmount_and_deregister() {
@@ -130,13 +138,16 @@ unmount_and_deregister() {
 
     bashio::log.info "Hot-plug: $devname removed ($mdisk)"
 
-    bashio::api.supervisor DELETE "/mounts/${mdisk}" 2>/dev/null \
-        || bashio::log.warning "Hot-plug: could not remove HA mount $mdisk"
+    if [[ "$EXPOSE_NETWORK_STORAGE" == "true" ]]; then
+        bashio::api.supervisor DELETE "/mounts/${mdisk}" 2>/dev/null \
+            || bashio::log.warning "Hot-plug: could not remove HA mount $mdisk"
+    fi
 
     umount -l "/mnt/$mdisk" 2>/dev/null || true
     rmdir "/mnt/$mdisk" 2>/dev/null || true
 
-    python3 - "$mdisk" << 'PYEOF'
+    if [[ "$EXPOSE_NETWORK_STORAGE" == "true" ]]; then
+        python3 - "$mdisk" << 'PYEOF'
 import sys, re
 label = sys.argv[1]
 with open('/etc/samba/smb.conf', 'r') as f:
@@ -145,7 +156,8 @@ content = re.sub(rf'\[{re.escape(label)}\][^\[]*', '', content)
 with open('/etc/samba/smb.conf', 'w') as f:
     f.write(content)
 PYEOF
-    smbcontrol smbd reload-config 2>/dev/null || true
+        smbcontrol smbd reload-config 2>/dev/null || true
+    fi
 
     jq --arg k "$mdisk" 'del(.[$k])' \
         /tmp/mountit_mounts.json > /tmp/mountit_mounts.json.tmp \

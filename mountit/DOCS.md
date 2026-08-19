@@ -1,17 +1,18 @@
 # Mount It
 
-Automatically detects and mounts external USB/SATA drives, then exposes them as
-Home Assistant network storage (CIFS) via the Supervisor Mounts API.
+Automatically detects and mounts external USB/SATA drives. By default it exposes
+them as Home Assistant network storage (CIFS) via the Supervisor Mounts API, but
+you can disable that and keep the mounts local to the add-on.
 
 ## How it works
 
 1. On startup, detected drives are mounted inside the addon at `/mnt/<label>`
-2. A minimal Samba server exposes each mount as a private share
-3. The HA Supervisor registers each share as network storage (Settings → Storage)
+2. If `expose_network_storage` is enabled, a minimal Samba server exposes each mount as a private share
+3. If enabled, the HA Supervisor registers each share as network storage (Settings → Storage)
 4. On shutdown, HA network mounts are cleanly removed and drives unmounted
 
-Hot-plugging a drive while the addon is running will automatically mount and register
-it (if `automount_on_plugin` is enabled).
+Hot-plugging a drive while the addon is running will automatically mount it and,
+when enabled, register it as network storage (if `automount_on_plugin` is enabled).
 
 ## Configuration
 
@@ -21,8 +22,11 @@ it (if `automount_on_plugin` is enabled).
 | `automount_on_plugin` | `true` | Automatically mount drives when plugged in |
 | `specific_label` | `""` | If set, only this drive label is mounted (applies to startup and hot-plug) |
 | `mount_location` | `media` | Where to expose drives: `media`, `share`, or `backup` |
+| `expose_network_storage` | `true` | Start Samba and register mounts in Home Assistant. Disable to keep mounts local to the add-on only. |
 | `hdd_idle_seconds` | `0` | Spin down drives after N seconds idle (0 = disabled). The HAOS system disk is always excluded. |
 | `file_activity_detail` | `off` | File activity logging level: `off`, `basic`, or `detailed` |
+
+When `expose_network_storage` is `false`, Mount It still mounts drives under `/mnt`, but it does not start Samba, register anything in **Settings → Storage**, or process `folder_mounts`.
 
 ## File Activity Log
 
@@ -51,6 +55,7 @@ Both successful and failed operations are recorded.
 - `detailed` can produce thousands of lines while copying a large file and may slow transfers.
 - The log is not persisted by the addon; it lives in the addon's container log.
 - Samba 4.14 or newer is required. On older versions, activity logging stays off.
+- File activity logging only applies when `expose_network_storage` is enabled.
 
 ## Folder Mounts (Advanced)
 
@@ -74,6 +79,8 @@ Each folder mount:
 - Is registered in HA as a separate network storage entry
 - Can use an optional `name` containing letters, numbers, and underscores
 - Appears in HA using `name`, or `<DriveLabel>_<FolderPath>` when `name` is omitted
+
+`folder_mounts` is ignored when `expose_network_storage` is disabled.
 
 ## Supported filesystems
 

@@ -3,6 +3,11 @@
 # ==============================================================================
 # Remove all registered CIFS mounts from HA Supervisor on shutdown
 # ==============================================================================
+if ! bashio::config.true 'expose_network_storage'; then
+    bashio::log.info "HA network storage deregistration skipped"
+    exit 0
+fi
+
 bashio::log.info "Deregistering drives from HA network storage..."
 
 if [[ ! -f /tmp/mountit_mounts.json ]]; then

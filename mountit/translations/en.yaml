@@ -9,15 +9,19 @@ configuration:
     description: >-
       Automatically mount drives when they are plugged in (default: true)
   specific_label:
-    name: Specific Label (Startup Only)
+    name: Specific Label
     description: >-
-      If set, only mount this specific drive label at startup.
-      Hot-plug will still mount all drives.
+      If set, only mount this specific drive label at startup and on hot-plug.
       Leave empty to mount all labeled drives (default: empty)
   mount_location:
     name: Mount Location
     description: >-
       Default HA storage location to expose drives: media, share, or backup (default: media)
+  expose_network_storage:
+    name: Expose as Network Storage
+    description: >-
+      Expose mounted drives to Home Assistant as network storage and start the internal Samba server.
+      Disable this to keep mounts local to the add-on only (default: true)
   hdd_idle_seconds:
     name: HDD Idle Power-Down
     description: >-
@@ -32,10 +36,11 @@ configuration:
   folder_mounts:
     name: Folder Mounts (Advanced)
     description: >-
-      Map specific folders within mounted drives to different HA storage locations. Drives must be mounted first.
+      Map specific folders within mounted drives to different HA storage locations.
+      Drives must be mounted first. Ignored when network storage exposure is disabled.
     fields:
       name:
-        name: Name (optionel)
+        name: Name (optional)
         description: >-
           The name shown in Network Storage. Use only letters, numbers, and underscores.
           Leave empty to use the default drive-and-folder name.

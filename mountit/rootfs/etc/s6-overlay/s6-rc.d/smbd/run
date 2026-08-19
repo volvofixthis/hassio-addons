@@ -1,7 +1,13 @@
-#!/usr/bin/env bash
+#!/command/with-contenv bashio
+# shellcheck shell=bash
 # ==============================================================================
 # Start smbd service
 # ==============================================================================
+if ! bashio::config.true 'expose_network_storage'; then
+  bashio::log.info "Samba disabled (expose_network_storage=false)"
+  exec sleep infinity
+fi
+
 exec smbd \
   --foreground \
   --debug-stdout \

@@ -4,6 +4,11 @@
 # Register mounted drives with the HA Supervisor as CIFS network storage
 # ==============================================================================
 
+if ! bashio::config.true 'expose_network_storage'; then
+    bashio::log.info "HA network storage registration disabled"
+    exit 0
+fi
+
 if [[ ! -f /tmp/mountit_mounts.json ]] || [[ "$(jq 'length' /tmp/mountit_mounts.json)" -eq 0 ]]; then
     bashio::log.info "No drives to register"
     exit 0

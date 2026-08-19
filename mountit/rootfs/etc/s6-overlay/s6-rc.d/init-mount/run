@@ -13,36 +13,50 @@ if $(bashio::addon.protected); then
 fi
 
 echo "{}" > /tmp/mountit_mounts.json
+echo "{}" > /tmp/mountit_folder_mounts.json
 mkdir -p /mnt
-
-# ---- Samba service account ----
-PASSWORD=$(sed 's/[-]//g' /proc/sys/kernel/random/uuid | head -c 20)
-(umask 077; echo "$PASSWORD" > /tmp/mountit_password)
-(echo "$PASSWORD"; echo "$PASSWORD") | smbpasswd -a -s _mountit_ 2>/dev/null \
-    || (echo "$PASSWORD"; echo "$PASSWORD") | smbpasswd -s _mountit_ 2>/dev/null \
-    || bashio::log.warning "Could not set Samba password — HA registration may fail"
 
 # ---- Config ----
 specific_label=$(bashio::config 'specific_label' 2>/dev/null || echo "")
 mount_location=$(bashio::config 'mount_location')
+EXPOSE_NETWORK_STORAGE=false
+if bashio::config.true 'expose_network_storage'; then
+    EXPOSE_NETWORK_STORAGE=true
+fi
 
 addon_ip=$(bashio::addon.ip_address 2>/dev/null || echo "")
 addon_ip="${addon_ip/\/*/}"
 echo "$addon_ip" > /tmp/mountit_ip
+
+if [[ "$EXPOSE_NETWORK_STORAGE" == "true" ]]; then
+    # ---- Samba service account ----
+    PASSWORD=$(sed 's/[-]//g' /proc/sys/kernel/random/uuid | head -c 20)
+    (umask 077; echo "$PASSWORD" > /tmp/mountit_password)
+    (echo "$PASSWORD"; echo "$PASSWORD") | smbpasswd -a -s _mountit_ 2>/dev/null \
+        || (echo "$PASSWORD"; echo "$PASSWORD") | smbpasswd -s _mountit_ 2>/dev/null \
+        || bashio::log.warning "Could not set Samba password — HA registration may fail"
+else
+    : > /tmp/mountit_password
+fi
 
 bashio::log.blue "Configuration"
 bashio::log.info "  mount_unlabeled:     $(bashio::config 'mount_unlabeled')"
 bashio::log.info "  automount_on_plugin: $(bashio::config 'automount_on_plugin')"
 bashio::log.info "  specific_label:      ${specific_label:-(any)}"
 bashio::log.info "  mount_location:      $mount_location"
+bashio::log.info "  expose_network_storage: $EXPOSE_NETWORK_STORAGE"
 bashio::log.info "  hdd_idle_seconds:    $(bashio::config 'hdd_idle_seconds')"
-bashio::log.info "  samba bind address:  ${addon_ip:-(all interfaces)}"
+if [[ "$EXPOSE_NETWORK_STORAGE" == "true" ]]; then
+    bashio::log.info "  samba bind address:  ${addon_ip:-(all interfaces)}"
+fi
 
 # ---- File activity auditing (Samba full_audit VFS module) ----
 # Migrate the previous toggle/detail pair without unexpectedly enabling logging
 # for users whose File Activity Log toggle was off.
 audit_detail=$(bashio::config 'file_activity_detail' 2>/dev/null || echo "off")
-if ! addon_options=$(bashio::addon.options 2>/dev/null); then
+if [[ "$EXPOSE_NETWORK_STORAGE" != "true" ]]; then
+    audit_detail="off"
+elif ! addon_options=$(bashio::addon.options 2>/dev/null); then
     audit_detail="off"
     bashio::log.warning "  file_activity_detail: off — could not inspect legacy settings"
 elif bashio::jq.exists "$addon_options" ".file_activity_log"; then
@@ -241,9 +255,10 @@ fi
 
 mounted_count=$(jq 'length' /tmp/mountit_mounts.json)
 
-# ---- Samba config ----
-{
-cat << 'GLOBAL_END'
+if [[ "$EXPOSE_NETWORK_STORAGE" == "true" ]]; then
+    # ---- Samba config ----
+    {
+    cat << 'GLOBAL_END'
 [global]
    workgroup = WORKGROUP
    server string = Mount It
@@ -256,143 +271,142 @@ cat << 'GLOBAL_END'
    ea support = Yes
 GLOBAL_END
 
-# full_audit goes last in the chain so it reports the real on-disk path, and so
-# NTFS alternate data streams already folded into xattrs by streams_xattr do not
-# show up as separate file activity. syslog = No sends the audit trail to smbd's
-# own debug output, which the addon log shows (smbd runs with --debug-stdout).
-if [[ -n "$audit_ops" ]]; then
-    printf '   vfs objects = catia streams_xattr full_audit\n'
-    printf '   log level = 0 full_audit:1\n'
-    printf '   full_audit:prefix = %%T|%%I|%%S\n'
-    printf '   full_audit:success = %s\n' "$audit_ops"
-    printf '   full_audit:failure = %s\n' "$audit_ops"
-    printf '   full_audit:syslog = No\n'
-    printf '   full_audit:log_secdesc = No\n'
-    printf '   max log size = 0\n'
-else
-    printf '   vfs objects = catia streams_xattr\n'
-    printf '   log level = 0\n'
-fi
+    # full_audit goes last in the chain so it reports the real on-disk path, and so
+    # NTFS alternate data streams already folded into xattrs by streams_xattr do not
+    # show up as separate file activity. syslog = No sends the audit trail to smbd's
+    # own debug output, which the addon log shows (smbd runs with --debug-stdout).
+    if [[ -n "$audit_ops" ]]; then
+        printf '   vfs objects = catia streams_xattr full_audit\n'
+        printf '   log level = 0 full_audit:1\n'
+        printf '   full_audit:prefix = %%T|%%I|%%S\n'
+        printf '   full_audit:success = %s\n' "$audit_ops"
+        printf '   full_audit:failure = %s\n' "$audit_ops"
+        printf '   full_audit:syslog = No\n'
+        printf '   full_audit:log_secdesc = No\n'
+        printf '   max log size = 0\n'
+    else
+        printf '   vfs objects = catia streams_xattr\n'
+        printf '   log level = 0\n'
+    fi
 
-if [[ -n "$addon_ip" && "$addon_ip" != "null" ]]; then
-    printf '   bind interfaces only = Yes\n'
-    printf '   interfaces = %s\n\n' "$addon_ip"
-else
-    printf '   bind interfaces only = No\n\n'
-fi
+    if [[ -n "$addon_ip" && "$addon_ip" != "null" ]]; then
+        printf '   bind interfaces only = Yes\n'
+        printf '   interfaces = %s\n\n' "$addon_ip"
+    else
+        printf '   bind interfaces only = No\n\n'
+    fi
 
-while IFS= read -r label; do
-    mp=$(jq -r --arg l "$label" '.[$l].mount_point' /tmp/mountit_mounts.json)
-    printf '[%s]\n' "$label"
-    printf '   path = %s\n' "$mp"
-    printf '   valid users = _mountit_\n'
-    printf '   read only = No\n'
-    printf '   guest ok = No\n'
-    printf '   force user = root\n'
-    printf '   create mask = 0777\n'
-    printf '   directory mask = 0777\n\n'
-done < <(jq -r 'keys[]' /tmp/mountit_mounts.json 2>/dev/null)
+    while IFS= read -r label; do
+        mp=$(jq -r --arg l "$label" '.[$l].mount_point' /tmp/mountit_mounts.json)
+        printf '[%s]\n' "$label"
+        printf '   path = %s\n' "$mp"
+        printf '   valid users = _mountit_\n'
+        printf '   read only = No\n'
+        printf '   guest ok = No\n'
+        printf '   force user = root\n'
+        printf '   create mask = 0777\n'
+        printf '   directory mask = 0777\n\n'
+    done < <(jq -r 'keys[]' /tmp/mountit_mounts.json 2>/dev/null)
 
-} > /etc/samba/smb.conf
+    } > /etc/samba/smb.conf
 
-# ---- Folder mounts (subfolder → different HA location) ----
-echo "{}" > /tmp/mountit_folder_mounts.json
+    # ---- Folder mounts (subfolder → different HA location) ----
+    if [[ "$folder_mount_count" -gt 0 ]]; then
+        bashio::log.blue "Folder mounts"
+        reserved_names="media share backup config addons ssl homeassistant"
 
-folder_mount_count=$(jq '.folder_mounts | length' /data/options.json 2>/dev/null || echo "0")
+        for i in $(seq 0 $((folder_mount_count - 1))); do
+            configured_name=$(jq -r ".folder_mounts[$i].name // empty" /data/options.json)
+            drive=$(jq -r ".folder_mounts[$i].drive"    /data/options.json)
+            folder=$(jq -r ".folder_mounts[$i].folder"  /data/options.json)
+            location=$(jq -r ".folder_mounts[$i].location" /data/options.json)
 
-if [[ "$folder_mount_count" -gt 0 ]]; then
-    bashio::log.blue "Folder mounts"
-    reserved_names="media share backup config addons ssl homeassistant"
+            # Mount keys are sanitized to ^[A-Za-z0-9_]+$; accept the raw label too
+            drive_key=$(printf '%s' "$drive" | sed 's/[^A-Za-z0-9_]/_/g')
 
-    for i in $(seq 0 $((folder_mount_count - 1))); do
-        configured_name=$(jq -r ".folder_mounts[$i].name // empty" /data/options.json)
-        drive=$(jq -r ".folder_mounts[$i].drive"    /data/options.json)
-        folder=$(jq -r ".folder_mounts[$i].folder"  /data/options.json)
-        location=$(jq -r ".folder_mounts[$i].location" /data/options.json)
-
-        # Mount keys are sanitized to ^[A-Za-z0-9_]+$; accept the raw label too
-        drive_key=$(printf '%s' "$drive" | sed 's/[^A-Za-z0-9_]/_/g')
-
-        # Drive must be mounted
-        if ! jq -e --arg d "$drive_key" '.[$d]' /tmp/mountit_mounts.json > /dev/null 2>&1; then
-            bashio::log.error "  $drive/$folder — drive '$drive' is not mounted, skipping"
-            continue
-        fi
-
-        drive_mp=$(jq -r --arg d "$drive_key" '.[$d].mount_point' /tmp/mountit_mounts.json)
-        full_path="${drive_mp}/${folder}"
-
-        # Folder must exist
-        if [[ ! -d "$full_path" ]]; then
-            bashio::log.error "  $drive/$folder — path does not exist ($full_path), skipping"
-            continue
-        fi
-
-        # Auto-generate Samba share name: drive_sanitized_folder
-        folder_clean=$(echo "$folder" | sed 's|[^a-zA-Z0-9]|_|g; s|_\+|_|g; s|^_||; s|_$||')
-        share_name="${drive_key}_${folder_clean}"
-        mount_name="${configured_name:-$share_name}"
-
-        # HA Supervisor mount names may contain only letters, numbers, and underscores
-        if [[ ! "$mount_name" =~ ^[A-Za-z0-9_]+$ ]]; then
-            bashio::log.error "  $drive/$folder — network storage name '$mount_name' is invalid, skipping"
-            continue
-        fi
-
-        # Reserved name check
-        for rn in $reserved_names; do
-            if [[ "${mount_name,,}" == "${rn,,}" ]]; then
-                bashio::log.error "  $drive/$folder — network storage name '$mount_name' is reserved, skipping"
-                continue 2
+            # Drive must be mounted
+            if ! jq -e --arg d "$drive_key" '.[$d]' /tmp/mountit_mounts.json > /dev/null 2>&1; then
+                bashio::log.error "  $drive/$folder — drive '$drive' is not mounted, skipping"
+                continue
             fi
+
+            drive_mp=$(jq -r --arg d "$drive_key" '.[$d].mount_point' /tmp/mountit_mounts.json)
+            full_path="${drive_mp}/${folder}"
+
+            # Folder must exist
+            if [[ ! -d "$full_path" ]]; then
+                bashio::log.error "  $drive/$folder — path does not exist ($full_path), skipping"
+                continue
+            fi
+
+            # Auto-generate Samba share name: drive_sanitized_folder
+            folder_clean=$(echo "$folder" | sed 's|[^a-zA-Z0-9]|_|g; s|_\+|_|g; s|^_||; s|_$||')
+            share_name="${drive_key}_${folder_clean}"
+            mount_name="${configured_name:-$share_name}"
+
+            # HA Supervisor mount names may contain only letters, numbers, and underscores
+            if [[ ! "$mount_name" =~ ^[A-Za-z0-9_]+$ ]]; then
+                bashio::log.error "  $drive/$folder — network storage name '$mount_name' is invalid, skipping"
+                continue
+            fi
+
+            # Reserved name check
+            for rn in $reserved_names; do
+                if [[ "${mount_name,,}" == "${rn,,}" ]]; then
+                    bashio::log.error "  $drive/$folder — network storage name '$mount_name' is reserved, skipping"
+                    continue 2
+                fi
+            done
+
+            # The Samba share must not conflict with an existing drive share
+            if jq -e --arg n "$share_name" '.[$n]' /tmp/mountit_mounts.json > /dev/null 2>&1; then
+                bashio::log.error "  $drive/$folder — Samba share '$share_name' conflicts with a drive mount, skipping"
+                continue
+            fi
+
+            # The HA mount name must not conflict with an existing drive mount
+            if jq -e --arg n "$mount_name" '.[$n]' /tmp/mountit_mounts.json > /dev/null 2>&1; then
+                bashio::log.error "  $drive/$folder — network storage name '$mount_name' conflicts with a drive mount, skipping"
+                continue
+            fi
+
+            # The HA mount name must be unique across folder mounts
+            if jq -e --arg n "$mount_name" '.[$n]' /tmp/mountit_folder_mounts.json > /dev/null 2>&1; then
+                bashio::log.error "  $drive/$folder — network storage name '$mount_name' conflicts with another folder mount, skipping"
+                continue
+            fi
+
+            # The generated Samba share must also be unique across folder mounts
+            if jq -e --arg n "$share_name" '.[] | select(.share == $n)' /tmp/mountit_folder_mounts.json > /dev/null 2>&1; then
+                bashio::log.error "  $drive/$folder — Samba share '$share_name' conflicts with another folder mount, skipping"
+                continue
+            fi
+
+            # Append Samba share
+            {
+                printf '[%s]\n'                    "$share_name"
+                printf '   path = %s\n'            "$full_path"
+                printf '   valid users = _mountit_\n'
+                printf '   read only = No\n'
+                printf '   guest ok = No\n'
+                printf '   force user = root\n'
+                printf '   create mask = 0777\n'
+                printf '   directory mask = 0777\n\n'
+            } >> /etc/samba/smb.conf
+
+            # Track in state
+            jq --arg k "$mount_name" --arg share "$share_name" \
+               --arg drive "$drive" --arg folder "$folder" \
+               --arg path "$full_path" --arg loc "$location" \
+               '. + {($k): {"share":$share,"drive":$drive,"folder":$folder,"path":$path,"location":$loc}}' \
+               /tmp/mountit_folder_mounts.json > /tmp/mountit_folder_mounts.json.tmp \
+            && mv /tmp/mountit_folder_mounts.json.tmp /tmp/mountit_folder_mounts.json
+
+            bashio::log.green "  $drive/$folder → $mount_name [$share_name] ($location)"
         done
-
-        # The Samba share must not conflict with an existing drive share
-        if jq -e --arg n "$share_name" '.[$n]' /tmp/mountit_mounts.json > /dev/null 2>&1; then
-            bashio::log.error "  $drive/$folder — Samba share '$share_name' conflicts with a drive mount, skipping"
-            continue
-        fi
-
-        # The HA mount name must not conflict with an existing drive mount
-        if jq -e --arg n "$mount_name" '.[$n]' /tmp/mountit_mounts.json > /dev/null 2>&1; then
-            bashio::log.error "  $drive/$folder — network storage name '$mount_name' conflicts with a drive mount, skipping"
-            continue
-        fi
-
-        # The HA mount name must be unique across folder mounts
-        if jq -e --arg n "$mount_name" '.[$n]' /tmp/mountit_folder_mounts.json > /dev/null 2>&1; then
-            bashio::log.error "  $drive/$folder — network storage name '$mount_name' conflicts with another folder mount, skipping"
-            continue
-        fi
-
-        # The generated Samba share must also be unique across folder mounts
-        if jq -e --arg n "$share_name" '.[] | select(.share == $n)' /tmp/mountit_folder_mounts.json > /dev/null 2>&1; then
-            bashio::log.error "  $drive/$folder — Samba share '$share_name' conflicts with another folder mount, skipping"
-            continue
-        fi
-
-        # Append Samba share
-        {
-            printf '[%s]\n'                    "$share_name"
-            printf '   path = %s\n'            "$full_path"
-            printf '   valid users = _mountit_\n'
-            printf '   read only = No\n'
-            printf '   guest ok = No\n'
-            printf '   force user = root\n'
-            printf '   create mask = 0777\n'
-            printf '   directory mask = 0777\n\n'
-        } >> /etc/samba/smb.conf
-
-        # Track in state
-        jq --arg k "$mount_name" --arg share "$share_name" \
-           --arg drive "$drive" --arg folder "$folder" \
-           --arg path "$full_path" --arg loc "$location" \
-           '. + {($k): {"share":$share,"drive":$drive,"folder":$folder,"path":$path,"location":$loc}}' \
-           /tmp/mountit_folder_mounts.json > /tmp/mountit_folder_mounts.json.tmp \
-        && mv /tmp/mountit_folder_mounts.json.tmp /tmp/mountit_folder_mounts.json
-
-        bashio::log.green "  $drive/$folder → $mount_name [$share_name] ($location)"
-    done
+    fi
+else
+    bashio::log.info "Network storage exposure disabled; skipping Samba, HA mount registration, and folder mounts"
 fi
 
 folder_mounted_count=$(jq 'length' /tmp/mountit_folder_mounts.json)
